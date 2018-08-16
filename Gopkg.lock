@@ -2,17 +2,96 @@
 
 
 [[projects]]
+  name = "github.com/coreos/bbolt"
+  packages = ["."]
+  revision = "583e8937c61f1af6513608ccc75c97b6abdf4ff9"
+  version = "v1.3.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/dustin/go-couch"
+  packages = ["."]
+  revision = "8251128dab73e7f6d0ddb0fabb1a72eca7d160b6"
+
+[[projects]]
   branch = "master"
   name = "github.com/dustin/go-nntp"
   packages = [
     ".",
+    "client",
     "server"
   ]
-  revision = "c90cf61f8fabcb90ab2a56309fb0697b71314698"
+  revision = "77b1423455340e7e90e66444e87293fb7ba5dd66"
+  source = "https://github.com/mildred/go-nntp"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/dustin/httputil"
+  packages = ["."]
+  revision = "c47743f54f8958359297bafa434ca6c2acf36c42"
+
+[[projects]]
+  name = "github.com/emersion/go-imap"
+  packages = [
+    ".",
+    "backend",
+    "client",
+    "commands",
+    "responses",
+    "server",
+    "utf7"
+  ]
+  revision = "840b16b212bff35b595e708937c6d60861cfab49"
+  version = "v0.9"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/emersion/go-imap-idle"
+  packages = ["."]
+  revision = "2af93776db6b042cc1116b0d0af00d7f58eea696"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/emersion/go-sasl"
+  packages = ["."]
+  revision = "7e096a0a6197b89989e8cc31016daa67c8c62051"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/paulrosania/go-charset"
+  packages = [
+    "charset",
+    "data"
+  ]
+  revision = "621bb39fcc835dce592e682f5073025d0169587b"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/paulrosania/go-mail"
+  packages = ["."]
+  revision = "5e96d116f4cfb4d29f83f76e44d611a801cdbce5"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/sys"
+  packages = ["unix"]
+  revision = "e072cadbbdc8dd3d3ffa82b8b4b9304c261d9311"
+
+[[projects]]
+  name = "golang.org/x/text"
+  packages = [
+    "encoding",
+    "encoding/internal/identifier",
+    "internal/gen",
+    "transform",
+    "unicode/cldr"
+  ]
+  revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
+  version = "v0.3.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6e4a22ca7346e6dd9efa70143cc67335bb944dbcbb77cf6c085a9402c1791f8c"
+  inputs-digest = "3a890bb2d2271a8de9106bb8fbda0b6668051e4bc2e4ec0b606e5837dbc8b00d"
   solver-name = "gps-cdcl"
   solver-version = 1

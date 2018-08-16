@@ -28,6 +28,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/dustin/go-nntp"
+  source = "https://github.com/mildred/go-nntp"
 
 [prune]
   go-tests = true

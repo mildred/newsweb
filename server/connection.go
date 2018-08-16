@@ -2,13 +2,15 @@ package server
 
 import (
 	"bytes"
-	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
-	"strconv"
+	"net/textproto"
+	"strings"
 
 	"github.com/dustin/go-nntp"
 	"github.com/dustin/go-nntp/server"
+	"github.com/paulrosania/go-mail"
 
 	"github.com/mildred/newsweb/articles"
 )
@@ -18,8 +20,8 @@ func convertGroup(grp *articles.Group) *nntp.Group {
 		Name:        grp.Name,
 		Description: grp.Description,
 		Count:       grp.Count,
-		High:        grp.Low,
-		Low:         grp.High,
+		High:        grp.High,
+		Low:         grp.Low,
 		Posting:     nntp.PostingPermitted,
 	}
 }
@@ -32,7 +34,7 @@ func (s *Connection) ListGroups(max int) (res []*nntp.Group, err error) {
 	grps, err := s.Server.Articles.ListGroups()
 	if err != nil {
 		log.Printf("FATAL: %v", err)
-		return nil, err // TODO: report internal error instead of closing the connection
+		return nil, nntpserver.ErrFault
 	}
 	for _, grp := range grps {
 		if max >= 0 && len(res) >= max {
@@ -54,18 +56,80 @@ func (s *Connection) GetGroup(name string) (*nntp.Group, error) {
 	return convertGroup(grp), nil
 }
 
-func (s *Connection) GetArticle(group *nntp.Group, id string) (*nntp.Article, error) {
-	num, errNum := strconv.Atoi(id)
-	if errNum == nil {
-		_ = num
-		return nil, nntpserver.ErrInvalidArticleNumber
-	} else {
-		return nil, nntpserver.ErrInvalidMessageID
+func (s *Connection) GetArticleNum(group *nntp.Group, num int64) (io.ReadCloser, string, error) {
+	art, msgId, err := s.Server.Articles.GetArticleNum(group.Name, num)
+	if err == articles.ErrNoGroup {
+		return nil, "0", nntpserver.ErrNoSuchGroup
+	} else if err != nil {
+		log.Printf("ERROR: %v", err)
+		return nil, "0", nntpserver.ErrFault
+	} else if art == nil {
+		return nil, "0", nntpserver.ErrInvalidArticleNumber
 	}
+
+	if msgId == "" {
+		msgId = "0"
+	}
+
+	return art, msgId, nil
+}
+
+func (s *Connection) GetArticleMsgId(group *nntp.Group, id string) (io.ReadCloser, int64, error) {
+	art, num, err := s.Server.Articles.GetArticleMsgId(group.Name, id)
+	if err == articles.ErrNoGroup {
+		return nil, -1, nntpserver.ErrNoSuchGroup
+	} else if err != nil {
+		log.Printf("ERROR: %v", err)
+		return nil, -1, nntpserver.ErrFault
+	} else if art == nil {
+		return nil, -1, nntpserver.ErrInvalidMessageID
+	}
+
+	return art, num, nil
 }
 
 func (s *Connection) GetArticles(group *nntp.Group, from, to int64) ([]nntpserver.NumberedArticle, error) {
-	return nil, nil
+	var res []nntpserver.NumberedArticle
+	for num := from; num <= to; num++ {
+		art, _, err := s.Server.Articles.GetArticleNum(group.Name, num)
+		if err == articles.ErrNoGroup {
+			return nil, nntpserver.ErrNoSuchGroup
+		} else if err != nil {
+			log.Printf("ERROR: %v", err)
+			return nil, nntpserver.ErrFault
+		}
+		if art == nil {
+			continue
+		}
+		defer art.Close()
+
+		artBytes, err := ioutil.ReadAll(art)
+		if err != nil {
+			log.Printf("ERROR: %v", err)
+			return nil, nntpserver.ErrFault
+		}
+
+		msg, err := mail.ReadMessage(string(artBytes))
+		if err != nil {
+			log.Printf("ERROR: %v", err)
+			return nil, nntpserver.ErrFault
+		}
+
+		a := nntpserver.NumberedArticle{
+			Num: num,
+			Article: &nntp.Article{
+				Body:   nil,
+				Bytes:  msg.RFC822Size,
+				Lines:  bytes.Count(artBytes, []byte("\n")),
+				Header: textproto.MIMEHeader{},
+			},
+		}
+		for _, header := range msg.Header.Fields {
+			a.Article.Header.Add(header.Name(), header.Value())
+		}
+		res = append(res, a)
+	}
+	return res, nil
 }
 
 func (s *Connection) Authorized() bool {
@@ -82,38 +146,57 @@ func (s *Connection) AllowPost() bool {
 	return true
 }
 
-func (s *Connection) Post(article *nntp.Article) error {
-	groups := article.Header["Newsgroups"]
-	if len(groups) == 0 {
-		log.Print("ERROR: Newsgroup header absent")
-		return nntpserver.ErrPostingFailed
-	}
-
-	// TODO: keep original articles with headers in same order
-	var data bytes.Buffer
-	for name, values := range article.Header {
-		for _, val := range values {
-			fmt.Fprintf(&data, "%s: %s\r\n", name, val)
-		}
-	}
-
-	fmt.Fprint(&data, "\r\n")
-	_, err := io.Copy(&data, article.Body)
+func (s *Connection) Post(article io.Reader) error {
+	var buffer = new(bytes.Buffer)
+	_, err := io.Copy(buffer, article)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		return nntpserver.ErrPostingFailed
 	}
 
-	var ok = true
-	for _, group := range groups {
-		_, err = s.Server.Articles.Post(group, data.Bytes())
-		if err != nil {
-			log.Printf("ERROR: %v", err)
-			ok = false
-		}
+	msg, err := mail.ReadMessage(string(buffer.Bytes()))
+	if err != nil {
+		log.Printf("ERROR: %v", err)
+		return nntpserver.ErrPostingFailed
 	}
 
-	if !ok {
+	from := msg.Header.Addresses(mail.FromFieldName)
+	// TODO: handle the mail addresses in the form of "localpart"@domain
+	fromAddr := from[0].Localpart + "@" + from[0].Domain
+	token, err := s.Server.Validations.GenValidationToken(fromAddr)
+	if err != nil {
+		log.Printf("ERROR: %v", err)
+		return nntpserver.ErrPostingFailed
+	}
+
+	validationMail := s.Server.Mailer.GenValidationMail(fromAddr, token)
+	err = s.Server.Mailer.Send(validationMail, fromAddr)
+	if err != nil {
+		log.Printf("ERROR: %v", err)
+		return nntpserver.ErrPostingFailed
+	}
+
+	var msgId string
+	var groups []string
+	for _, hdr := range msg.Header.Fields {
+		if strings.ToLower(hdr.Name()) == "newsgroups" {
+			groups = append(groups, hdr.Value())
+		} else if strings.ToLower(hdr.Name()) == "message-id" {
+			if msgId != "" {
+				log.Print("ERROR: Duplicate Message-Id")
+				return nntpserver.ErrPostingFailed
+			}
+			msgId = hdr.Value()
+		}
+	}
+	if len(groups) == 0 {
+		log.Print("ERROR: Newsgroup header absent")
+		return nntpserver.ErrPostingFailed
+	}
+
+	err = s.Server.Articles.Post(groups, msgId, buffer.Bytes())
+	if err != nil {
+		log.Printf("ERROR: %v", err)
 		return nntpserver.ErrPostingFailed
 	}
 
