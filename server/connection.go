@@ -13,6 +13,7 @@ import (
 	"github.com/paulrosania/go-mail"
 
 	"github.com/mildred/newsweb/articles"
+	"github.com/mildred/newsweb/message"
 )
 
 func convertGroup(grp *articles.Group) *nntp.Group {
@@ -161,8 +162,7 @@ func (s *Connection) Post(article io.Reader) error {
 	}
 
 	from := msg.Header.Addresses(mail.FromFieldName)
-	// TODO: handle the mail addresses in the form of "localpart"@domain
-	fromAddr := from[0].Localpart + "@" + from[0].Domain
+	fromAddr := message.AddressString(from[0])
 	token, err := s.Server.Validations.GenValidationToken(fromAddr)
 	if err != nil {
 		log.Printf("ERROR: %v", err)

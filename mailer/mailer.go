@@ -10,15 +10,20 @@ import (
 )
 
 type Mailer struct {
-	Host      string
-	SmtpPort  string
-	ImapPort  string
-	Mail      string
-	User      string
-	Pass      string
-	PassFd    int
-	PassFile  string
-	ImapDebug bool
+	Host        string
+	SmtpPort    string
+	ImapPort    string
+	Mail        string
+	User        string
+	Pass        string
+	PassFd      int
+	PassFile    string
+	ImapDebug   bool
+	Validations Validations
+}
+
+type Validations interface {
+	ReceivedEmailToken(email, token string) error
 }
 
 func (m *Mailer) Start(ctx context.Context, wg *sync.WaitGroup) error {

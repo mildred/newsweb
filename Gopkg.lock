@@ -31,6 +31,7 @@
   revision = "c47743f54f8958359297bafa434ca6c2acf36c42"
 
 [[projects]]
+  branch = "v1"
   name = "github.com/emersion/go-imap"
   packages = [
     ".",
@@ -41,8 +42,7 @@
     "server",
     "utf7"
   ]
-  revision = "840b16b212bff35b595e708937c6d60861cfab49"
-  version = "v0.9"
+  revision = "e402a386e2001febf508c43e85d1a1383dca9e3c"
 
 [[projects]]
   branch = "master"
@@ -51,10 +51,26 @@
   revision = "2af93776db6b042cc1116b0d0af00d7f58eea696"
 
 [[projects]]
+  name = "github.com/emersion/go-message"
+  packages = [
+    ".",
+    "charset",
+    "mail"
+  ]
+  revision = "f7e2be8074d097a816a1f5bd9d502adc46275d4a"
+  version = "v0.9.1"
+
+[[projects]]
   branch = "master"
   name = "github.com/emersion/go-sasl"
   packages = ["."]
   revision = "7e096a0a6197b89989e8cc31016daa67c8c62051"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/emersion/go-textwrapper"
+  packages = ["."]
+  revision = "d0e65e56babe3f687ff94c1d764ca0e6aa7723ee"
 
 [[projects]]
   branch = "master"
@@ -75,13 +91,18 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "e072cadbbdc8dd3d3ffa82b8b4b9304c261d9311"
+  revision = "1c9583448a9c3aa0f9a6a5241bf73c0bd8aafded"
 
 [[projects]]
   name = "golang.org/x/text"
   packages = [
     "encoding",
+    "encoding/charmap",
+    "encoding/internal",
     "encoding/internal/identifier",
+    "encoding/japanese",
+    "encoding/simplifiedchinese",
+    "encoding/traditionalchinese",
     "internal/gen",
     "transform",
     "unicode/cldr"
@@ -92,6 +113,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3a890bb2d2271a8de9106bb8fbda0b6668051e4bc2e4ec0b606e5837dbc8b00d"
+  inputs-digest = "41bc30f8f04bd4c9cb6fe66e80906f72cc61f68b855947c811aacc0b8bf288f6"
   solver-name = "gps-cdcl"
   solver-version = 1

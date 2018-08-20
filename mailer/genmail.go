@@ -1,13 +1,29 @@
 package mailer
 
 import (
+	"bytes"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"time"
 
 	"github.com/paulrosania/go-mail"
 )
 
+const (
+	UuidEmailValidation = "8ce7db75-31c1-4308-974e-0971c19fa158"
+)
+
+func genHexToken(size int) string {
+	var data = make([]byte, size)
+	_, _ = rand.Read(data)
+	var enc bytes.Buffer
+	base64.NewEncoder(base64.RawURLEncoding, &enc).Write(data)
+	return string(enc.Bytes())
+}
+
 func (m *Mailer) GenValidationMail(to, token string) []byte {
+	tok := genHexToken(16)
 	msg := mail.NewMessage()
 	msg.Header = &mail.Header{}
 	msg.Header.Add("From", m.Mail)
@@ -33,10 +49,11 @@ replying, you need to sign the message using your PGP secret key.
 ------------------------------------------------------------
 Please keep the following text in your reply:
 
-secret token:   %s
-e-mail address: %s
+mail type:      %s:%s
+secret token:   %s:t:%s
+e-mail address: %s:e:%s
 ------------------------------------------------------------
-`, to, token, to),
+`, to, tok, UuidEmailValidation, tok, token, tok, to),
 		},
 	}
 

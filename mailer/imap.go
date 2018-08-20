@@ -3,15 +3,19 @@ package mailer
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
 	"sync"
 	"time"
 
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap-idle"
 	"github.com/emersion/go-imap/client"
+	"github.com/emersion/go-message/mail"
 )
 
 func (m *Mailer) connect(ctx context.Context) (c *client.Client, err error) {
@@ -130,7 +134,6 @@ func (m *Mailer) readMessages(ctx context.Context, c *client.Client, mbox *imap.
 	log.Printf("DEBUG: read messages from %d to %d", 1, mbox.Messages)
 	go func() {
 		err := c.Fetch(seqset, []imap.FetchItem{section.FetchItem()}, messages)
-		log.Printf("err: %v", err)
 		done <- err
 	}()
 
@@ -148,8 +151,11 @@ loop:
 			if msg == nil {
 				break loop
 			}
-			log.Printf("message: %+v", msg)
-			m.readMessage(msg)
+			log.Printf("INFO: IMAP received message")
+			err := m.readMessage(msg)
+			if err != nil {
+				return err
+			}
 
 			// First mark the message as deleted
 			delseqset := new(imap.SeqSet)
@@ -167,19 +173,54 @@ loop:
 	return c.Expunge(nil)
 }
 
-func (m *Mailer) readMessage(msg *imap.Message) {
+func (m *Mailer) readMessage(msg *imap.Message) error {
 	section := &imap.BodySectionName{} // whole message
 	part := msg.GetBody(section)
 	if part == nil {
-		log.Fatal("No part available")
+		return fmt.Errorf("No part available")
 	}
-	log.Print("==========")
-	data, err := ioutil.ReadAll(part)
+	r, err := mail.CreateReader(part)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	log.Print(string(data))
-	log.Print("=========")
+
+	for part, err := r.NextPart(); err != io.EOF; part, err = r.NextPart() {
+		var data []byte
+		data, err = ioutil.ReadAll(part.Body)
+		if err != nil {
+			return err
+		}
+		mat := validationUuidRegexp.FindStringSubmatch(string(data))
+		if mat == nil {
+			continue
+		}
+		tok := mat[1]
+		mat = validationTokenRegexp(tok).FindStringSubmatch(string(data))
+		if mat == nil {
+			continue
+		}
+		token := mat[1]
+		mat = validationEmailRegexp(tok).FindStringSubmatch(string(data))
+		if mat == nil {
+			continue
+		}
+		email := mat[1]
+		log.Printf("INFO: IMAP received validation for %s with token %s", email, token)
+		err := m.Validations.ReceivedEmailToken(email, token)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var validationUuidRegexp = regexp.MustCompile("(\\S*):" + regexp.QuoteMeta(UuidEmailValidation))
+
+func validationTokenRegexp(uniqueTok string) *regexp.Regexp {
+	return regexp.MustCompile(regexp.QuoteMeta(uniqueTok) + ":t:(\\S*)")
+}
+func validationEmailRegexp(uniqueTok string) *regexp.Regexp {
+	return regexp.MustCompile(regexp.QuoteMeta(uniqueTok) + ":e:(\\S*)")
 }
 
 func (m *Mailer) run(ctx context.Context, c *client.Client) error {

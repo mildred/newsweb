@@ -30,6 +30,10 @@
   name = "github.com/dustin/go-nntp"
   source = "https://github.com/mildred/go-nntp"
 
+[[constraint]]
+  branch = "v1"
+  name = "github.com/emersion/go-imap"
+
 [prune]
   go-tests = true
   unused-packages = true
